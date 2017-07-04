@@ -21,7 +21,6 @@ import org.hibernate.HibernateException;
 import org.hibernate.LockMode;
 import org.hibernate.MappingException;
 import org.hibernate.ScrollMode;
-import org.hibernate.ScrollableResults;
 import org.hibernate.SessionException;
 import org.hibernate.StatelessSession;
 import org.hibernate.UnresolvableObjectException;
@@ -46,6 +45,7 @@ import org.hibernate.persister.entity.EntityPersister;
 import org.hibernate.persister.entity.OuterJoinLoadable;
 import org.hibernate.pretty.MessageHelper;
 import org.hibernate.proxy.HibernateProxy;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 
 /**
  * @author Gavin King
@@ -178,8 +178,9 @@ public class StatelessSessionImpl extends AbstractSharedSessionContract implemen
 	@Override
 	public Object get(String entityName, Serializable id, LockMode lockMode) {
 		checkOpen();
-		Object result = getFactory().getEntityPersister( entityName )
-				.load( id, null, lockMode, this );
+
+		Object result = getFactory().getMetamodel().entityPersister( entityName )
+				.load( id, null, getNullSafeLockMode( lockMode ), this );
 		if ( temporaryPersistenceContext.isLoadFinished() ) {
 			temporaryPersistenceContext.clear();
 		}
@@ -227,7 +228,7 @@ public class StatelessSessionImpl extends AbstractSharedSessionContract implemen
 		Object result = null;
 		try {
 			this.getLoadQueryInfluencers().setInternalFetchProfile( "refresh" );
-			result = persister.load( id, entity, lockMode, this );
+			result = persister.load( id, entity, getNullSafeLockMode( lockMode ), this );
 		}
 		finally {
 			this.getLoadQueryInfluencers().setInternalFetchProfile( previousFetchProfile );
@@ -253,7 +254,7 @@ public class StatelessSessionImpl extends AbstractSharedSessionContract implemen
 			String entityName,
 			Serializable id) throws HibernateException {
 		checkOpen();
-		return getFactory().getEntityPersister( entityName ).instantiate( id, this );
+		return getFactory().getMetamodel().entityPersister( entityName ).instantiate( id, this );
 	}
 
 	@Override
@@ -263,7 +264,7 @@ public class StatelessSessionImpl extends AbstractSharedSessionContract implemen
 			boolean eager,
 			boolean nullable) throws HibernateException {
 		checkOpen();
-		EntityPersister persister = getFactory().getEntityPersister( entityName );
+		EntityPersister persister = getFactory().getMetamodel().entityPersister( entityName );
 		// first, try to load it from the temp PC associated to this SS
 		Object loaded = temporaryPersistenceContext.getEntity( generateEntityKey( id, persister ) );
 		if ( loaded != null ) {
@@ -498,7 +499,7 @@ public class StatelessSessionImpl extends AbstractSharedSessionContract implemen
 	}
 
 	@Override
-	public ScrollableResults scroll(Criteria criteria, ScrollMode scrollMode) {
+	public ScrollableResultsImplementor scroll(Criteria criteria, ScrollMode scrollMode) {
 		// TODO: Is this guaranteed to always be CriteriaImpl?
 		CriteriaImpl criteriaImpl = (CriteriaImpl) criteria;
 
@@ -581,7 +582,7 @@ public class StatelessSessionImpl extends AbstractSharedSessionContract implemen
 	}
 
 	@Override
-	public ScrollableResults scrollCustomQuery(CustomQuery customQuery, QueryParameters queryParameters)
+	public ScrollableResultsImplementor scrollCustomQuery(CustomQuery customQuery, QueryParameters queryParameters)
 			throws HibernateException {
 		checkOpen();
 		CustomLoader loader = new CustomLoader( customQuery, getFactory() );
@@ -589,7 +590,7 @@ public class StatelessSessionImpl extends AbstractSharedSessionContract implemen
 	}
 
 	@Override
-	public ScrollableResults scroll(String query, QueryParameters queryParameters) throws HibernateException {
+	public ScrollableResultsImplementor scroll(String query, QueryParameters queryParameters) throws HibernateException {
 		checkOpen();
 		HQLQueryPlan plan = getQueryPlan( query, false );
 		return plan.performScroll( queryParameters, this );
@@ -668,5 +669,9 @@ public class StatelessSessionImpl extends AbstractSharedSessionContract implemen
 
 	private JtaPlatform getJtaPlatform() {
 		return getFactory().getServiceRegistry().getService( JtaPlatform.class );
+	}
+
+	private LockMode getNullSafeLockMode(LockMode lockMode) {
+		return lockMode == null ? LockMode.NONE : lockMode;
 	}
 }

@@ -296,6 +296,13 @@ public abstract class EntityType extends AbstractType implements AssociationType
 			return null;
 		}
 		Object cached = copyCache.get( original );
+		if ( cached == null ) {
+			// Avoid creation of invalid managed -> managed mapping in copyCache when traversing
+			// cascade loop (@OneToMany(cascade=ALL) with associated @ManyToOne(cascade=ALL)) in entity graph
+			if ( copyCache.containsValue( original ) ) {
+				cached = original;
+			}
+		}
 		if ( cached != null ) {
 			return cached;
 		}
@@ -492,8 +499,15 @@ public abstract class EntityType extends AbstractType implements AssociationType
 			return "null";
 		}
 
-		EntityPersister persister = getAssociatedEntityPersister( factory );
-		StringBuilder result = new StringBuilder().append( associatedEntityName );
+		final EntityPersister persister = getAssociatedEntityPersister( factory );
+		if ( !persister.getEntityTuplizer().isInstance( value ) ) {
+			// it should be the id type...
+			if ( persister.getIdentifierType().getReturnedClass().isInstance( value ) ) {
+				return associatedEntityName + "#" + value;
+			}
+		}
+
+		final StringBuilder result = new StringBuilder().append( associatedEntityName );
 
 		if ( persister.hasIdentifierProperty() ) {
 			final Serializable id;
@@ -668,7 +682,7 @@ public abstract class EntityType extends AbstractType implements AssociationType
 		final SessionFactoryImplementor factory = session.getFactory();
 		UniqueKeyLoadable persister = (UniqueKeyLoadable) factory.getMetamodel().entityPersister( entityName );
 
-		//TODO: implement caching?! proxies?!
+		//TODO: implement 2nd level caching?! natural id caching ?! proxies?!
 
 		EntityUniqueKey euk = new EntityUniqueKey(
 				entityName,
@@ -683,7 +697,14 @@ public abstract class EntityType extends AbstractType implements AssociationType
 		Object result = persistenceContext.getEntity( euk );
 		if ( result == null ) {
 			result = persister.loadByUniqueKey( uniqueKeyPropertyName, key, session );
+			
+			// If the entity was not in the Persistence Context, but was found now,
+			// add it to the Persistence Context
+			if (result != null) {
+				persistenceContext.addEntity(euk, result);
+			}
 		}
+
 		return result == null ? null : persistenceContext.proxyFor( result );
 	}
 

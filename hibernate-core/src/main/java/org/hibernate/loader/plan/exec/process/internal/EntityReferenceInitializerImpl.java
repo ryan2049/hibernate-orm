@@ -133,7 +133,7 @@ public class EntityReferenceInitializerImpl implements EntityReferenceInitialize
 		// Look for the hydrated form
 		final Object identifierHydratedForm = processingState.getIdentifierHydratedForm();
 		if ( identifierHydratedForm == null ) {
-			// we need to register the missing identifier, but that happens later afterQuery all readers have had a chance
+			// we need to register the missing identifier, but that happens later after all readers have had a chance
 			// to resolve its EntityKey
 			return;
 		}
@@ -201,25 +201,23 @@ public class EntityReferenceInitializerImpl implements EntityReferenceInitialize
 		// Otherwise, we need to load it from the ResultSet...
 
 		// determine which entity instance to use.  Either the supplied one, or instantiate one
-		Object optionalEntityInstance = null;
-		if ( isReturn && context.shouldUseOptionalEntityInformation() ) {
+		Object entityInstance = null;
+		if ( isReturn &&
+				context.shouldUseOptionalEntityInformation() &&
+				context.getQueryParameters().getOptionalObject() != null ) {
 			final EntityKey optionalEntityKey = ResultSetProcessorHelper.getOptionalObjectKey(
 					context.getQueryParameters(),
 					context.getSession()
 			);
-			if ( optionalEntityKey != null ) {
-				if ( optionalEntityKey.equals( entityKey ) ) {
-					optionalEntityInstance = context.getQueryParameters().getOptionalObject();
-				}
+			if ( optionalEntityKey != null && optionalEntityKey.equals( entityKey ) ) {
+				entityInstance = context.getQueryParameters().getOptionalObject();
 			}
 		}
 
 		final String concreteEntityTypeName = getConcreteEntityTypeName( resultSet, context, entityKey );
-
-		final Object entityInstance = optionalEntityInstance != null
-				? optionalEntityInstance
-				: context.getSession().instantiate( concreteEntityTypeName, entityKey.getIdentifier() );
-
+		if ( entityInstance == null ) {
+			entityInstance = context.getSession().instantiate( concreteEntityTypeName, entityKey.getIdentifier() );
+		}
 		processingState.registerEntityInstance( entityInstance );
 
 		// need to hydrate it.
@@ -330,6 +328,13 @@ public class EntityReferenceInitializerImpl implements EntityReferenceInitialize
 			rowId = concreteEntityPersister.hasRowId()
 					? resultSet.getObject( entityReferenceAliases.getColumnAliases().getRowIdAlias() )
 					: null;
+
+			if ( rowId != null && log.isTraceEnabled() ) {
+				log.tracev(
+						"extracted ROWID value: {0}",
+						rowId
+				);
+			}
 		}
 		catch (SQLException e) {
 			throw context.getSession().getFactory().getServiceRegistry().getService( JdbcServices.class ).getSqlExceptionHelper().convert(

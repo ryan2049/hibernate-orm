@@ -19,7 +19,6 @@ import org.hibernate.FlushMode;
 import org.hibernate.HibernateException;
 import org.hibernate.Interceptor;
 import org.hibernate.ScrollMode;
-import org.hibernate.ScrollableResults;
 import org.hibernate.SharedSessionContract;
 import org.hibernate.Transaction;
 import org.hibernate.collection.spi.PersistentCollection;
@@ -30,9 +29,9 @@ import org.hibernate.engine.query.spi.sql.NativeSQLQuerySpecification;
 import org.hibernate.loader.custom.CustomQuery;
 import org.hibernate.persister.entity.EntityPersister;
 import org.hibernate.query.spi.QueryProducerImplementor;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.resource.jdbc.spi.JdbcSessionOwner;
 import org.hibernate.resource.transaction.spi.TransactionCoordinator;
-import org.hibernate.resource.transaction.spi.TransactionCoordinatorBuilder;
 import org.hibernate.resource.transaction.spi.TransactionCoordinatorBuilder.Options;
 import org.hibernate.type.descriptor.WrapperOptions;
 
@@ -51,7 +50,7 @@ import org.hibernate.type.descriptor.WrapperOptions;
  *         {@link Options}
  *         to drive the creation of the {@link TransactionCoordinator} delegate.
  *         This allows it to be passed along to
- *         {@link TransactionCoordinatorBuilder#buildTransactionCoordinator}
+ *         {@link org.hibernate.resource.transaction.spi.TransactionCoordinatorBuilder#buildTransactionCoordinator}
  *     </li>
  *     <li>
  *         {@link org.hibernate.engine.jdbc.LobCreationContext} to act as the context for JDBC LOB instance creation
@@ -118,6 +117,15 @@ public interface SharedSessionContractImplementor
 	boolean isClosed();
 
 	/**
+	 * Checks whether the session is open or is waiting for auto-close
+	 *
+	 * @return {@code true} if the session is closed or if it's waiting for auto-close; {@code false} otherwise.
+	 */
+	default boolean isOpenOrWaitingForAutoClose() {
+		return !isClosed();
+	}
+
+	/**
 	 * Performs a check whether the Session is open, and if not:<ul>
 	 *     <li>marks current transaction (if one) for rollback only</li>
 	 *     <li>throws an IllegalStateException (JPA defines the exception type)</li>
@@ -141,7 +149,7 @@ public interface SharedSessionContractImplementor
 	void markForRollbackOnly();
 
 	/**
-	 * System time beforeQuery the start of the transaction
+	 * System time before the start of the transaction
 	 */
 	long getTimestamp();
 
@@ -178,7 +186,7 @@ public interface SharedSessionContractImplementor
 	Interceptor getInterceptor();
 
 	/**
-	 * Enable/disable automatic cache clearing from afterQuery transaction
+	 * Enable/disable automatic cache clearing from after transaction
 	 * completion (for EJB3)
 	 */
 	void setAutoClear(boolean enabled);
@@ -223,12 +231,12 @@ public interface SharedSessionContractImplementor
 	/**
 	 * Execute a <tt>scroll()</tt> query
 	 */
-	ScrollableResults scroll(String query, QueryParameters queryParameters) throws HibernateException;
+	ScrollableResultsImplementor scroll(String query, QueryParameters queryParameters) throws HibernateException;
 
 	/**
 	 * Execute a criteria query
 	 */
-	ScrollableResults scroll(Criteria criteria, ScrollMode scrollMode);
+	ScrollableResultsImplementor scroll(Criteria criteria, ScrollMode scrollMode);
 
 	/**
 	 * Execute a criteria query
@@ -290,7 +298,7 @@ public interface SharedSessionContractImplementor
 	/**
 	 * Execute an SQL Query
 	 */
-	ScrollableResults scrollCustomQuery(CustomQuery customQuery, QueryParameters queryParameters)
+	ScrollableResultsImplementor scrollCustomQuery(CustomQuery customQuery, QueryParameters queryParameters)
 			throws HibernateException;
 
 	/**
@@ -316,7 +324,7 @@ public interface SharedSessionContractImplementor
 	 *
 	 * @throws HibernateException
 	 */
-	ScrollableResults scroll(NativeSQLQuerySpecification spec, QueryParameters queryParameters);
+	ScrollableResultsImplementor scroll(NativeSQLQuerySpecification spec, QueryParameters queryParameters);
 
 	int getDontFlushFromFind();
 
@@ -399,6 +407,10 @@ public interface SharedSessionContractImplementor
 	boolean shouldAutoClose();
 
 	boolean isAutoCloseSessionEnabled();
+
+	default boolean isQueryParametersValidationEnabled(){
+		return getFactory().getSessionFactoryOptions().isQueryParametersValidationEnabled();
+	}
 
 	/**
 	 * Get the load query influencers associated with this session.

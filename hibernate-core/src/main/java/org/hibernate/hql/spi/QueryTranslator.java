@@ -15,10 +15,10 @@ import java.util.Set;
 import org.hibernate.HibernateException;
 import org.hibernate.MappingException;
 import org.hibernate.QueryException;
-import org.hibernate.ScrollableResults;
 import org.hibernate.engine.spi.QueryParameters;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.event.spi.EventSource;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.type.Type;
 
 /**
@@ -73,7 +73,7 @@ public interface QueryTranslator {
 	 * @return The ScrollableResults wrapper around the query results.
 	 * @throws HibernateException
 	 */
-	ScrollableResults scroll(QueryParameters queryParameters, SharedSessionContractImplementor session)
+	ScrollableResultsImplementor scroll(QueryParameters queryParameters, SharedSessionContractImplementor session)
 			throws HibernateException;
 
 	/**

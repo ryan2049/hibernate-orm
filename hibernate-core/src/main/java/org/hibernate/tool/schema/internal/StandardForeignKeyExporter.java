@@ -100,16 +100,20 @@ public class StandardForeignKeyExporter implements Exporter<ForeignKey> {
 				dialect
 		);
 
-		final StringBuilder buffer = new StringBuilder( "alter table " )
-				.append( sourceTableName )
+		final StringBuilder buffer = new StringBuilder( dialect.getAlterTableString( sourceTableName ) )
 				.append(
-						dialect.getAddForeignKeyConstraintString(
-								foreignKey.getName(),
-								columnNames,
-								targetTableName,
-								targetColumnNames,
-								foreignKey.isReferenceToPrimaryKey()
-						)
+						foreignKey.getKeyDefinition() != null ?
+								dialect.getAddForeignKeyConstraintString(
+										foreignKey.getName(),
+										foreignKey.getKeyDefinition()
+								) :
+								dialect.getAddForeignKeyConstraintString(
+										foreignKey.getName(),
+										columnNames,
+										targetTableName,
+										targetColumnNames,
+										foreignKey.isReferenceToPrimaryKey()
+								)
 				);
 
 		if ( dialect.supportsCascadeDelete() ) {
@@ -141,7 +145,8 @@ public class StandardForeignKeyExporter implements Exporter<ForeignKey> {
 				dialect
 		);
 		return new String[] {
-				"alter table " + sourceTableName + dialect.getDropForeignKeyString() + foreignKey.getName()
+				dialect.getAlterTableString( sourceTableName )
+						+ dialect.getDropForeignKeyString() + foreignKey.getName()
 		};
 	}
 }

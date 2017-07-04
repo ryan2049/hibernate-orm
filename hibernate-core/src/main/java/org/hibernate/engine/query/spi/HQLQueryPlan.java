@@ -18,7 +18,6 @@ import java.util.Set;
 import org.hibernate.Filter;
 import org.hibernate.HibernateException;
 import org.hibernate.QueryException;
-import org.hibernate.ScrollableResults;
 import org.hibernate.engine.spi.QueryParameters;
 import org.hibernate.engine.spi.RowSelection;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
@@ -36,6 +35,7 @@ import org.hibernate.internal.util.collections.EmptyIterator;
 import org.hibernate.internal.util.collections.IdentitySet;
 import org.hibernate.internal.util.collections.JoinedIterator;
 import org.hibernate.query.internal.ParameterMetadataImpl;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.type.Type;
 
 /**
@@ -151,7 +151,7 @@ public class HQLQueryPlan implements Serializable {
 	}
 
 	public ParameterMetadataImpl getParameterMetadata() {
-		return parameterMetadata;
+		return parameterMetadata.getOrdinalParametersZeroBasedCopy();
 	}
 
 	public ReturnMetadata getReturnMetadata() {
@@ -333,7 +333,7 @@ public class HQLQueryPlan implements Serializable {
 	 *
 	 * @throws HibernateException Indicates a problem performing the query
 	 */
-	public ScrollableResults performScroll(
+	public ScrollableResultsImplementor performScroll(
 			QueryParameters queryParameters,
 			SharedSessionContractImplementor session) throws HibernateException {
 		if ( traceEnabled ) {

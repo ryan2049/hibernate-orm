@@ -664,6 +664,13 @@ public interface SessionFactoryBuilder {
 	SessionFactoryBuilder applyConnectionReleaseMode(ConnectionReleaseMode connectionReleaseMode);
 
 	/**
+	 * @see org.hibernate.cfg.AvailableSettings#CONNECTION_PROVIDER_DISABLES_AUTOCOMMIT
+	 */
+	default SessionFactoryBuilder applyConnectionProviderDisablesAutoCommit(boolean providerDisablesAutoCommit) {
+		return this;
+	}
+
+	/**
 	 * Should Hibernate apply comments to SQL it generates?
 	 *
 	 * @param enabled {@code true} indicates comments should be applied; {@code false} indicates not.
@@ -686,6 +693,16 @@ public interface SessionFactoryBuilder {
 	 * @return {@code this}, for method chaining
 	 */
 	SessionFactoryBuilder applySqlFunction(String registrationName, SQLFunction sqlFunction);
+
+	SessionFactoryBuilder allowOutOfTransactionUpdateOperations(boolean allow);
+
+	/**
+	 * Should resources held by {@link javax.persistence.EntityManager} instance be released immediately on close?
+	 * <p/>
+	 * The other option is to release them as part of an after-transaction callback.
+	 *
+	 */
+	SessionFactoryBuilder enableReleaseResourcesOnCloseEnabled(boolean enable);
 
 	/**
 	 * Allows unwrapping this builder as another, more specific type.

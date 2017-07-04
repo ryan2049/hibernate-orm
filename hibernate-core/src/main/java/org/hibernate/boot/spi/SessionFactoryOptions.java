@@ -7,6 +7,7 @@
 package org.hibernate.boot.spi;
 
 import java.util.Map;
+import java.util.TimeZone;
 
 import org.hibernate.ConnectionReleaseMode;
 import org.hibernate.CustomEntityDirtinessStrategy;
@@ -59,6 +60,10 @@ public interface SessionFactoryOptions {
 	boolean isJpaBootstrap();
 
 	boolean isJtaTransactionAccessEnabled();
+
+	default boolean isAllowRefreshDetachedEntity() {
+		return false;
+	}
 
 	/**
 	 * The name to be used for the SessionFactory.  This is use both in:<ul>
@@ -142,6 +147,8 @@ public interface SessionFactoryOptions {
 
 	boolean isNamedQueryStartupCheckingEnabled();
 
+	boolean isConventionalJavaConstants();
+
 	boolean isSecondLevelCacheEnabled();
 
 	boolean isQueryCacheEnabled();
@@ -174,6 +181,10 @@ public interface SessionFactoryOptions {
 
 	PhysicalConnectionHandlingMode getPhysicalConnectionHandlingMode();
 
+	default boolean doesConnectionProviderDisableAutoCommit() {
+		return false;
+	}
+
 	/**
 	 * @deprecated Use {@link #getPhysicalConnectionHandlingMode()} instead
 	 */
@@ -200,4 +211,16 @@ public interface SessionFactoryOptions {
 	boolean isPreferUserTransaction();
 
 	boolean isProcedureParameterNullPassingEnabled();
+
+	boolean isCollectionJoinSubqueryRewriteEnabled();
+
+	boolean isAllowOutOfTransactionUpdateOperations();
+
+	boolean isReleaseResourcesOnCloseEnabled();
+
+	TimeZone getJdbcTimeZone();
+
+	default boolean isQueryParametersValidationEnabled(){
+		return isJpaBootstrap();
+	}
 }

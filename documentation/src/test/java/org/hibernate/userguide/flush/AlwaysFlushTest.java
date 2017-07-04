@@ -24,7 +24,7 @@ import org.junit.Test;
 
 import org.jboss.logging.Logger;
 
-import static org.hibernate.userguide.util.TransactionUtil.doInJPA;
+import static org.hibernate.testing.transaction.TransactionUtil.doInJPA;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -56,7 +56,7 @@ public class AlwaysFlushTest extends BaseEntityManagerFunctionalTestCase {
 
             Session session = entityManager.unwrap( Session.class);
             assertTrue(((Number) session
-                    .createSQLQuery("select count(*) from Person")
+                    .createNativeQuery("select count(*) from Person")
                     .setFlushMode( FlushMode.ALWAYS)
                     .uniqueResult()).intValue() == 1);
             //end::flushing-always-flush-sql-example[]

@@ -51,6 +51,7 @@ import org.hibernate.persister.entity.Lockable;
 import org.hibernate.type.StandardBasicTypes;
 
 import org.jboss.logging.Logger;
+import java.sql.DatabaseMetaData;
 
 /**
  * An SQL dialect compatible with HSQLDB (HyperSQL).
@@ -351,7 +352,7 @@ public class HSQLDialect extends Dialect {
 
 	@Override
 	protected String getDropSequenceString(String sequenceName) {
-		return "drop sequence " + sequenceName;
+		return "drop sequence " + sequenceName + " if exists";
 	}
 
 	@Override
@@ -668,5 +669,10 @@ public class HSQLDialect extends Dialect {
 	@Override
 	public NameQualifierSupport getNameQualifierSupport() {
 		return NameQualifierSupport.SCHEMA;
+	}
+
+	@Override
+	public boolean supportsNamedParameters(DatabaseMetaData databaseMetaData) throws SQLException {
+		return false;
 	}
 }

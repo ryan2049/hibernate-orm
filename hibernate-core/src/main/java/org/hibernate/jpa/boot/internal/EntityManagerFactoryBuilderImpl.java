@@ -12,7 +12,9 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import java.util.StringTokenizer;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.persistence.AttributeConverter;
@@ -22,8 +24,6 @@ import javax.persistence.PersistenceException;
 import javax.persistence.spi.PersistenceUnitTransactionType;
 import javax.sql.DataSource;
 
-import javassist.CtClass;
-import javassist.CtField;
 
 import org.hibernate.SessionFactory;
 import org.hibernate.SessionFactoryObserver;
@@ -43,6 +43,8 @@ import org.hibernate.boot.registry.BootstrapServiceRegistry;
 import org.hibernate.boot.registry.BootstrapServiceRegistryBuilder;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.hibernate.boot.registry.classloading.internal.TcclLookupPrecedence;
+import org.hibernate.boot.registry.classloading.spi.ClassLoaderService;
 import org.hibernate.boot.registry.selector.StrategyRegistrationProvider;
 import org.hibernate.boot.registry.selector.spi.StrategySelector;
 import org.hibernate.boot.spi.MetadataBuilderImplementor;
@@ -50,6 +52,8 @@ import org.hibernate.boot.spi.MetadataImplementor;
 import org.hibernate.boot.spi.SessionFactoryBuilderImplementor;
 import org.hibernate.bytecode.enhance.spi.DefaultEnhancementContext;
 import org.hibernate.bytecode.enhance.spi.EnhancementContext;
+import org.hibernate.bytecode.enhance.spi.UnloadedClass;
+import org.hibernate.bytecode.enhance.spi.UnloadedField;
 import org.hibernate.cfg.AttributeConverterDefinition;
 import org.hibernate.cfg.Environment;
 import org.hibernate.cfg.beanvalidation.BeanValidationIntegrator;
@@ -102,7 +106,6 @@ import static org.hibernate.internal.HEMLogging.messageLogger;
 import static org.hibernate.jpa.AvailableSettings.CFG_FILE;
 import static org.hibernate.jpa.AvailableSettings.CLASS_CACHE_PREFIX;
 import static org.hibernate.jpa.AvailableSettings.COLLECTION_CACHE_PREFIX;
-import static org.hibernate.jpa.AvailableSettings.DISCARD_PC_ON_CLOSE;
 import static org.hibernate.jpa.AvailableSettings.PERSISTENCE_UNIT_NAME;
 
 /**
@@ -144,7 +147,6 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 	private final StandardServiceRegistry standardServiceRegistry;
 	private final ManagedResources managedResources;
 	private final MetadataBuilderImplementor metamodelBuilder;
-	private final SettingsImpl settings;
 
 	private static class JpaEntityNotFoundDelegate implements EntityNotFoundDelegate, Serializable {
 		/**
@@ -158,14 +160,29 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 	}
 
 	public EntityManagerFactoryBuilderImpl(PersistenceUnitDescriptor persistenceUnit, Map integrationSettings) {
-		this( persistenceUnit, integrationSettings, null );
+		this( persistenceUnit, integrationSettings, null, null );
 	}
 
 	public EntityManagerFactoryBuilderImpl(
 			PersistenceUnitDescriptor persistenceUnit,
 			Map integrationSettings,
 			ClassLoader providedClassLoader ) {
-		
+		this( persistenceUnit, integrationSettings, providedClassLoader, null);
+	}
+
+	public EntityManagerFactoryBuilderImpl(
+			PersistenceUnitDescriptor persistenceUnit,
+			Map integrationSettings,
+			ClassLoaderService providedClassLoaderService ) {
+		this( persistenceUnit, integrationSettings, null, providedClassLoaderService);
+	}
+	
+	private EntityManagerFactoryBuilderImpl(
+			PersistenceUnitDescriptor persistenceUnit,
+			Map integrationSettings,
+			ClassLoader providedClassLoader,
+			ClassLoaderService providedClassLoaderService) {
+
 		LogHelper.logPersistenceUnitInformation( persistenceUnit );
 
 		this.persistenceUnit = persistenceUnit;
@@ -175,7 +192,7 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 		}
 
 		// Build the boot-strap service registry, which mainly handles class loader interactions
-		final BootstrapServiceRegistry bsr = buildBootstrapServiceRegistry( integrationSettings, providedClassLoader );
+		final BootstrapServiceRegistry bsr = buildBootstrapServiceRegistry( integrationSettings, providedClassLoader, providedClassLoaderService);
 
 		// merge configuration sources and build the "standard" service registry
 		final StandardServiceRegistryBuilder ssrBuilder = new StandardServiceRegistryBuilder( bsr );
@@ -184,7 +201,7 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 
 		// Build the "standard" service registry
 		ssrBuilder.applySettings( configurationValues );
-		this.settings = configure( ssrBuilder );
+		configure( ssrBuilder );
 		this.standardServiceRegistry = ssrBuilder.build();
 		configure( standardServiceRegistry, mergedSettings );
 
@@ -262,39 +279,39 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 		return new DefaultEnhancementContext() {
 
 			@Override
-			public boolean isEntityClass(CtClass classDescriptor) {
+			public boolean isEntityClass(UnloadedClass classDescriptor) {
 				return managedResources.getAnnotatedClassNames().contains( classDescriptor.getName() )
 						&& super.isEntityClass( classDescriptor );
 			}
 
 			@Override
-			public boolean isCompositeClass(CtClass classDescriptor) {
+			public boolean isCompositeClass(UnloadedClass classDescriptor) {
 				return managedResources.getAnnotatedClassNames().contains( classDescriptor.getName() )
 						&& super.isCompositeClass( classDescriptor );
 			}
 
 			@Override
-			public boolean doBiDirectionalAssociationManagement(CtField field) {
+			public boolean doBiDirectionalAssociationManagement(UnloadedField field) {
 				return associationManagementEnabled;
 			}
 
 			@Override
-			public boolean doDirtyCheckingInline(CtClass classDescriptor) {
+			public boolean doDirtyCheckingInline(UnloadedClass classDescriptor) {
 				return dirtyTrackingEnabled;
 			}
 
 			@Override
-			public boolean hasLazyLoadableAttributes(CtClass classDescriptor) {
+			public boolean hasLazyLoadableAttributes(UnloadedClass classDescriptor) {
 				return lazyInitializationEnabled;
 			}
 
 			@Override
-			public boolean isLazyLoadable(CtField field) {
+			public boolean isLazyLoadable(UnloadedField field) {
 				return lazyInitializationEnabled;
 			}
 
 			@Override
-			public boolean doExtendedEnhancement(CtClass classDescriptor) {
+			public boolean doExtendedEnhancement(UnloadedClass classDescriptor) {
 				// doesn't make any sense to have extended enhancement enabled at runtime. we only enhance entities anyway.
 				return false;
 			}
@@ -312,8 +329,10 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 	 */
 	private BootstrapServiceRegistry buildBootstrapServiceRegistry(
 			Map integrationSettings,
-			ClassLoader providedClassLoader) {
+			ClassLoader providedClassLoader,
+			ClassLoaderService providedClassLoaderService) {
 		final BootstrapServiceRegistryBuilder bsrBuilder = new BootstrapServiceRegistryBuilder();
+
 		bsrBuilder.applyIntegrator( new JpaIntegrator() );
 
 		final IntegratorProvider integratorProvider = (IntegratorProvider) integrationSettings.get( INTEGRATOR_PROVIDER );
@@ -333,37 +352,53 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 
 
 		// ClassLoaders ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+		// NOTE: See BootstrapServiceRegistryBuilder#build.  providedClassLoaderService and providedClassLoaders are
+		// mutually exclusive concepts, with priority given to the former
 
-		if ( persistenceUnit.getClassLoader() != null ) {
-			bsrBuilder.applyClassLoader( persistenceUnit.getClassLoader() );
+		if ( providedClassLoaderService != null ) {
+			bsrBuilder.applyClassLoaderService( providedClassLoaderService );
 		}
+		else {
+			if ( persistenceUnit.getClassLoader() != null ) {
+				bsrBuilder.applyClassLoader( persistenceUnit.getClassLoader() );
+			}
 
-		if ( providedClassLoader != null ) {
-			bsrBuilder.applyClassLoader( providedClassLoader );
-		}
+			if ( providedClassLoader != null ) {
+				bsrBuilder.applyClassLoader( providedClassLoader );
+			}
 
-		final ClassLoader appClassLoader = (ClassLoader) integrationSettings.get( org.hibernate.cfg.AvailableSettings.APP_CLASSLOADER );
-		if ( appClassLoader != null ) {
-			LOG.debugf(
-					"Found use of deprecated `%s` setting; use `%s` instead.",
-					org.hibernate.cfg.AvailableSettings.APP_CLASSLOADER,
-					org.hibernate.cfg.AvailableSettings.CLASSLOADERS
-			);
-		}
-		final Object classLoadersSetting = integrationSettings.get( org.hibernate.cfg.AvailableSettings.CLASSLOADERS );
-		if ( classLoadersSetting != null ) {
-			if ( java.util.Collection.class.isInstance( classLoadersSetting ) ) {
-				for ( ClassLoader classLoader : (java.util.Collection<ClassLoader>) classLoadersSetting ) {
-					bsrBuilder.applyClassLoader( classLoader );
+			final ClassLoader appClassLoader = (ClassLoader) integrationSettings.get( org.hibernate.cfg.AvailableSettings.APP_CLASSLOADER );
+			if ( appClassLoader != null ) {
+				LOG.debugf(
+						"Found use of deprecated `%s` setting; use `%s` instead.",
+						org.hibernate.cfg.AvailableSettings.APP_CLASSLOADER,
+						org.hibernate.cfg.AvailableSettings.CLASSLOADERS
+				);
+			}
+			final Object classLoadersSetting = integrationSettings.get( org.hibernate.cfg.AvailableSettings.CLASSLOADERS );
+			if ( classLoadersSetting != null ) {
+				if ( java.util.Collection.class.isInstance( classLoadersSetting ) ) {
+					for ( ClassLoader classLoader : (java.util.Collection<ClassLoader>) classLoadersSetting ) {
+						bsrBuilder.applyClassLoader( classLoader );
+					}
+				}
+				else if ( classLoadersSetting.getClass().isArray() ) {
+					for ( ClassLoader classLoader : (ClassLoader[]) classLoadersSetting ) {
+						bsrBuilder.applyClassLoader( classLoader );
+					}
+				}
+				else if ( ClassLoader.class.isInstance( classLoadersSetting ) ) {
+					bsrBuilder.applyClassLoader( (ClassLoader) classLoadersSetting );
 				}
 			}
-			else if ( classLoadersSetting.getClass().isArray() ) {
-				for ( ClassLoader classLoader : (ClassLoader[]) classLoadersSetting ) {
-					bsrBuilder.applyClassLoader( classLoader );
+                        
+			//configurationValues not assigned yet, using directly the properties of the PU
+			Properties puProperties = persistenceUnit.getProperties();
+			if( puProperties != null ) {
+				final String tcclLookupPrecedence = puProperties.getProperty( org.hibernate.cfg.AvailableSettings.TC_CLASSLOADER );
+				if( tcclLookupPrecedence != null ) {
+					bsrBuilder.applyTcclLookupPrecedence( TcclLookupPrecedence.valueOf( tcclLookupPrecedence.toUpperCase( Locale.ROOT ) ) );
 				}
-			}
-			else if ( ClassLoader.class.isInstance( classLoadersSetting ) ) {
-				bsrBuilder.applyClassLoader( (ClassLoader) classLoadersSetting );
 			}
 		}
 
@@ -555,21 +590,15 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 		return new CacheRegionDefinition( cacheType, role, usage, region, lazyProperty );
 	}
 
-	private SettingsImpl configure(StandardServiceRegistryBuilder ssrBuilder) {
-		final SettingsImpl settings = new SettingsImpl();
+	private void configure(StandardServiceRegistryBuilder ssrBuilder) {
 
 		applyJdbcConnectionProperties( ssrBuilder );
-		applyTransactionProperties( ssrBuilder, settings );
+		applyTransactionProperties( ssrBuilder );
 
-		// flush beforeQuery completion validation
+		// flush before completion validation
 		if ( "true".equals( configurationValues.get( Environment.FLUSH_BEFORE_COMPLETION ) ) ) {
 			ssrBuilder.applySetting( Environment.FLUSH_BEFORE_COMPLETION, "false" );
 			LOG.definingFlushBeforeCompletionIgnoredInHem( Environment.FLUSH_BEFORE_COMPLETION );
-		}
-
-		final Object value = configurationValues.get( DISCARD_PC_ON_CLOSE );
-		if ( value != null ) {
-			settings.setReleaseResourcesOnCloseEnabled( "true".equals( value ) );
 		}
 
 //		final StrategySelector strategySelector = ssrBuilder.getBootstrapServiceRegistry().getService( StrategySelector.class );
@@ -579,8 +608,6 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 //					loadSessionInterceptorClass( interceptorSetting, strategySelector )
 //			);
 //		}
-
-		return settings;
 	}
 
 	private void applyJdbcConnectionProperties(StandardServiceRegistryBuilder ssrBuilder) {
@@ -621,7 +648,7 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 		}
 	}
 
-	private void applyTransactionProperties(StandardServiceRegistryBuilder ssrBuilder, SettingsImpl settings) {
+	private void applyTransactionProperties(StandardServiceRegistryBuilder ssrBuilder) {
 		PersistenceUnitTransactionType txnType = PersistenceUnitTransactionTypeHelper.interpretTransactionType(
 				configurationValues.get( JPA_TRANSACTION_TYPE )
 		);
@@ -632,7 +659,6 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 			// is it more appropriate to have this be based on bootstrap entry point (EE vs SE)?
 			txnType = PersistenceUnitTransactionType.RESOURCE_LOCAL;
 		}
-		settings.setTransactionType( txnType );
 		boolean hasTxStrategy = configurationValues.containsKey( TRANSACTION_COORDINATOR_STRATEGY );
 		if ( hasTxStrategy ) {
 			LOG.overridingTransactionStrategyDangerous( TRANSACTION_COORDINATOR_STRATEGY );
@@ -884,6 +910,11 @@ public class EntityManagerFactoryBuilderImpl implements EntityManagerFactoryBuil
 		final boolean jtaTransactionAccessEnabled = readBooleanConfigurationValue( AvailableSettings.ALLOW_JTA_TRANSACTION_ACCESS );
 		if ( !jtaTransactionAccessEnabled ) {
 			( ( SessionFactoryBuilderImplementor ) sfBuilder ).disableJtaTransactionAccess();
+		}
+
+		final boolean allowRefreshDetachedEntity = readBooleanConfigurationValue( org.hibernate.cfg.AvailableSettings.ALLOW_REFRESH_DETACHED_ENTITY );
+		if ( !allowRefreshDetachedEntity ) {
+			( (SessionFactoryBuilderImplementor) sfBuilder ).disableRefreshDetachedEntity();
 		}
 
 		// Locate and apply any requested SessionFactoryObserver

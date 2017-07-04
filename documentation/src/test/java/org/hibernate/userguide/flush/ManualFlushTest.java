@@ -24,7 +24,7 @@ import org.junit.Test;
 
 import org.jboss.logging.Logger;
 
-import static org.hibernate.userguide.util.TransactionUtil.doInJPA;
+import static org.hibernate.testing.transaction.TransactionUtil.doInJPA;
 import static org.junit.Assert.assertTrue;
 
 /**
@@ -62,7 +62,7 @@ public class ManualFlushTest extends BaseEntityManagerFunctionalTestCase {
                 .getSingleResult()).intValue() == 0);
 
             assertTrue(((Number) session
-                .createSQLQuery("select count(*) from Person")
+                .createNativeQuery("select count(*) from Person")
                 .uniqueResult()).intValue() == 0);
             //end::flushing-manual-flush-example[]
         });

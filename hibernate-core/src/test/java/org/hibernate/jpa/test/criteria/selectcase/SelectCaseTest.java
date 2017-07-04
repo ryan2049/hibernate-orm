@@ -50,7 +50,6 @@ public class SelectCaseTest extends BaseEntityManagerFunctionalTestCase {
 	}
 
 	@Test
-	@RequiresDialect(value = H2Dialect.class, jiraKey = "HHH-10143")
 	public void selectCaseWithValuesShouldWork() {
 		EntityManager entityManager = getOrCreateEntityManager();
 		CriteriaBuilder cb = entityManager.getCriteriaBuilder();
@@ -80,13 +79,12 @@ public class SelectCaseTest extends BaseEntityManagerFunctionalTestCase {
 
 		CriteriaQuery<Entity> query = cb.createQuery( Entity.class );
 		Root<Entity> from = query.from( Entity.class );
-		query.select( from ).where( cb.equal( from.get( "value" ), selectCase.as( String.class ) ) );
+		query.select( from ).where( cb.equal( from.get( "value" ).as( String.class ), selectCase.as( String.class ) ) );
 
 		entityManager.createQuery( query ).getResultList();
 	}
 
 	@Test
-	@RequiresDialect(value = H2Dialect.class, jiraKey = "HHH-10143")
 	public void simpleSelectCaseWithValuesShouldWork() {
 		EntityManager entityManager = getOrCreateEntityManager();
 
@@ -115,7 +113,7 @@ public class SelectCaseTest extends BaseEntityManagerFunctionalTestCase {
 
 		CriteriaQuery<Entity> query = cb.createQuery( Entity.class );
 		Root<Entity> from = query.from( Entity.class );
-		query.select( from ).where( cb.equal( from.get( "value" ), selectCase.as( String.class ) ) );
+		query.select( from ).where( cb.equal( from.get( "value" ).as( String.class ), selectCase.as( String.class ) ) );
 
 		entityManager.createQuery( query ).getResultList();
 	}

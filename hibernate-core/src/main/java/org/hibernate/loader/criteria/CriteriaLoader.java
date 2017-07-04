@@ -19,7 +19,6 @@ import org.hibernate.LockMode;
 import org.hibernate.LockOptions;
 import org.hibernate.QueryException;
 import org.hibernate.ScrollMode;
-import org.hibernate.ScrollableResults;
 import org.hibernate.Session;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.engine.spi.LoadQueryInfluencers;
@@ -33,6 +32,7 @@ import org.hibernate.loader.spi.AfterLoadAction;
 import org.hibernate.persister.entity.Loadable;
 import org.hibernate.persister.entity.Lockable;
 import org.hibernate.persister.entity.OuterJoinLoadable;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.transform.ResultTransformer;
 import org.hibernate.type.Type;
 
@@ -97,7 +97,7 @@ public class CriteriaLoader extends OuterJoinLoader {
 
 	}
 
-	public ScrollableResults scroll(SharedSessionContractImplementor session, ScrollMode scrollMode)
+	public ScrollableResultsImplementor scroll(SharedSessionContractImplementor session, ScrollMode scrollMode)
 			throws HibernateException {
 		QueryParameters qp = translator.getQueryParameters();
 		qp.setScrollMode( scrollMode );
@@ -205,7 +205,8 @@ public class CriteriaLoader extends OuterJoinLoader {
 			return sql;
 		}
 
-		if ( dialect.useFollowOnLocking() ) {
+		if ( ( parameters.getLockOptions().getFollowOnLocking() == null && dialect.useFollowOnLocking( parameters ) ) ||
+			( parameters.getLockOptions().getFollowOnLocking() != null && parameters.getLockOptions().getFollowOnLocking() ) ) {
 			final LockMode lockMode = determineFollowOnLockMode( lockOptions );
 			if ( lockMode != LockMode.UPGRADE_SKIPLOCKED ) {
 				// Dialect prefers to perform locking in a separate step
@@ -232,7 +233,7 @@ public class CriteriaLoader extends OuterJoinLoader {
 		locks.setScope( lockOptions.getScope() );
 		locks.setTimeOut( lockOptions.getTimeOut() );
 
-		final Map keyColumnNames = dialect.forUpdateOfColumns() ? new HashMap() : null;
+		final Map<String,String[]> keyColumnNames = dialect.forUpdateOfColumns() ? new HashMap() : null;
 		final String[] drivingSqlAliases = getAliases();
 		for ( int i = 0; i < drivingSqlAliases.length; i++ ) {
 			final LockMode lockMode = lockOptions.getAliasSpecificLockMode( drivingSqlAliases[i] );

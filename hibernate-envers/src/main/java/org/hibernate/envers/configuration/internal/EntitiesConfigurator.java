@@ -46,12 +46,12 @@ public class EntitiesConfigurator {
 		// Creating a name register to capture all audit entity names created.
 		final AuditEntityNameRegister auditEntityNameRegister = new AuditEntityNameRegister();
 
-		// Sorting the persistent class topologically - superclass always beforeQuery subclass
+		// Sorting the persistent class topologically - superclass always before subclass
 		final Iterator<PersistentClass> classes = GraphTopologicalSort.sort( new PersistentClassGraphDefiner( metadata ) )
 				.iterator();
 
 		final ClassesAuditingData classesAuditingData = new ClassesAuditingData();
-		final Map<PersistentClass, EntityXmlMappingData> xmlMappings = new HashMap<PersistentClass, EntityXmlMappingData>();
+		final Map<PersistentClass, EntityXmlMappingData> xmlMappings = new HashMap<>();
 
 		// Reading metadata from annotations
 		while ( classes.hasNext() ) {

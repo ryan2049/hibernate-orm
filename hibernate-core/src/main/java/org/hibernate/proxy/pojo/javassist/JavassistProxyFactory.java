@@ -36,7 +36,7 @@ public class JavassistProxyFactory implements ProxyFactory, Serializable {
 	private static final MethodFilter FINALIZE_FILTER = new MethodFilter() {
 		public boolean isHandled(Method m) {
 			// skip finalize methods
-			return !( m.getParameterTypes().length == 0 && m.getName().equals( "finalize" ) );
+			return !( m.getParameterCount() == 0 && m.getName().equals( "finalize" ) );
 		}
 	};
 
@@ -126,8 +126,8 @@ public class JavassistProxyFactory implements ProxyFactory, Serializable {
 			return proxy;
 		}
 		catch (Throwable t) {
-			LOG.error( LOG.javassistEnhancementFailed( entityName ), t );
-			throw new HibernateException( LOG.javassistEnhancementFailed( entityName ), t );
+			LOG.error( LOG.bytecodeEnhancementFailed( entityName ), t );
+			throw new HibernateException( LOG.bytecodeEnhancementFailed( entityName ), t );
 		}
 	}
 
@@ -158,7 +158,7 @@ public class JavassistProxyFactory implements ProxyFactory, Serializable {
 			return proxy;
 		}
 		catch ( Throwable t ) {
-			final String message = LOG.javassistEnhancementFailed( serializableProxy.getEntityName() );
+			final String message = LOG.bytecodeEnhancementFailed( serializableProxy.getEntityName() );
 			LOG.error( message, t );
 			throw new HibernateException( message, t );
 		}

@@ -362,15 +362,35 @@ public class SequenceStyleGenerator
 	 * @return The adjusted increment size.
 	 */
 	protected int determineAdjustedIncrementSize(String optimizationStrategy, int incrementSize) {
-		if ( incrementSize > 1 && StandardOptimizerDescriptor.NONE.getExternalName().equals( optimizationStrategy ) ) {
-			LOG.honoringOptimizerSetting(
-					StandardOptimizerDescriptor.NONE.getExternalName(),
-					INCREMENT_PARAM,
-					incrementSize
-			);
-			incrementSize = 1;
+		final int resolvedIncrementSize;
+		if ( Math.abs( incrementSize ) > 1 &&
+				StandardOptimizerDescriptor.NONE.getExternalName().equals( optimizationStrategy ) ) {
+			if ( incrementSize < -1 ) {
+				resolvedIncrementSize = -1;
+				LOG.honoringOptimizerSetting(
+						StandardOptimizerDescriptor.NONE.getExternalName(),
+						INCREMENT_PARAM,
+						incrementSize,
+						"negative",
+						resolvedIncrementSize
+				);
+			}
+			else {
+				// incrementSize > 1
+				resolvedIncrementSize = 1;
+				LOG.honoringOptimizerSetting(
+						StandardOptimizerDescriptor.NONE.getExternalName(),
+						INCREMENT_PARAM,
+						incrementSize,
+						"positive",
+						resolvedIncrementSize
+				);
+			}
 		}
-		return incrementSize;
+		else {
+			resolvedIncrementSize = incrementSize;
+		}
+		return resolvedIncrementSize;
 	}
 
 	/**
@@ -382,7 +402,7 @@ public class SequenceStyleGenerator
 	 * @param forceTableUse Should a table be used even if the dialect supports sequences?
 	 * @param sequenceName The name to use for the sequence or table.
 	 * @param initialValue The initial value.
-	 * @param incrementSize the increment size to use (afterQuery any adjustments).
+	 * @param incrementSize the increment size to use (after any adjustments).
 	 *
 	 * @return An abstraction for the actual database structure in use (table vs. sequence).
 	 */
@@ -396,12 +416,32 @@ public class SequenceStyleGenerator
 			int incrementSize) {
 		final boolean useSequence = jdbcEnvironment.getDialect().supportsSequences() && !forceTableUse;
 		if ( useSequence ) {
-			return new SequenceStructure( jdbcEnvironment, sequenceName, initialValue, incrementSize, type.getReturnedClass() );
+			return buildSequenceStructure( type, params, jdbcEnvironment, sequenceName, initialValue, incrementSize );
 		}
 		else {
-			final Identifier valueColumnName = determineValueColumnName( params, jdbcEnvironment );
-			return new TableStructure( jdbcEnvironment, sequenceName, valueColumnName, initialValue, incrementSize, type.getReturnedClass() );
+			return buildTableStructure( type, params, jdbcEnvironment, sequenceName, initialValue, incrementSize );
 		}
+	}
+
+	protected DatabaseStructure buildSequenceStructure(
+			Type type,
+			Properties params,
+			JdbcEnvironment jdbcEnvironment,
+			QualifiedName sequenceName,
+			int initialValue,
+			int incrementSize) {
+		return new SequenceStructure( jdbcEnvironment, sequenceName, initialValue, incrementSize, type.getReturnedClass() );
+	}
+
+	protected DatabaseStructure buildTableStructure(
+			Type type,
+			Properties params,
+			JdbcEnvironment jdbcEnvironment,
+			QualifiedName sequenceName,
+			int initialValue,
+			int incrementSize) {
+		final Identifier valueColumnName = determineValueColumnName( params, jdbcEnvironment );
+		return new TableStructure( jdbcEnvironment, sequenceName, valueColumnName, initialValue, incrementSize, type.getReturnedClass() );
 	}
 
 

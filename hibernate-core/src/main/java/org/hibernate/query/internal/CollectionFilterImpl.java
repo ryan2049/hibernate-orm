@@ -11,9 +11,9 @@ import java.util.List;
 
 import org.hibernate.HibernateException;
 import org.hibernate.ScrollMode;
-import org.hibernate.ScrollableResults;
 import org.hibernate.engine.spi.SharedSessionContractImplementor;
 import org.hibernate.query.Query;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.type.Type;
 
 /**
@@ -66,12 +66,12 @@ public class CollectionFilterImpl extends org.hibernate.query.internal.AbstractP
 	}
 
 	@Override
-	public ScrollableResults scroll() throws HibernateException {
+	public ScrollableResultsImplementor scroll() throws HibernateException {
 		throw new UnsupportedOperationException( "Can't scroll filters" );
 	}
 
 	@Override
-	public ScrollableResults scroll(ScrollMode scrollMode) {
+	public ScrollableResultsImplementor scroll(ScrollMode scrollMode) {
 		throw new UnsupportedOperationException( "Can't scroll filters" );
 	}
 

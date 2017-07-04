@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import javax.persistence.FlushModeType;
@@ -26,7 +27,6 @@ import org.hibernate.LockOptions;
 import org.hibernate.MappingException;
 import org.hibernate.QueryException;
 import org.hibernate.ScrollMode;
-import org.hibernate.ScrollableResults;
 import org.hibernate.engine.ResultSetMappingDefinition;
 import org.hibernate.engine.query.spi.sql.NativeSQLQueryConstructorReturn;
 import org.hibernate.engine.query.spi.sql.NativeSQLQueryReturn;
@@ -40,6 +40,7 @@ import org.hibernate.query.NativeQuery;
 import org.hibernate.query.ParameterMetadata;
 import org.hibernate.query.QueryParameter;
 import org.hibernate.query.spi.NativeQueryImplementor;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.transform.ResultTransformer;
 import org.hibernate.type.Type;
 
@@ -121,6 +122,10 @@ public class NativeQueryImpl<T> extends AbstractProducedQuery<T> implements Nati
 		return this;
 	}
 
+	public void setZeroBasedParametersIndex(boolean zeroBasedParametersIndex) {
+		getParameterMetadata().setOrdinalParametersZeroBased( zeroBasedParametersIndex );
+	}
+
 	@Override
 	public String getQueryString() {
 		return sqlString;
@@ -183,10 +188,13 @@ public class NativeQueryImpl<T> extends AbstractProducedQuery<T> implements Nati
 	}
 
 	@Override
-	protected ScrollableResults doScroll(ScrollMode scrollMode) {
+	protected ScrollableResultsImplementor doScroll(ScrollMode scrollMode) {
+		final NativeSQLQuerySpecification nativeSQLQuerySpecification = generateQuerySpecification();
+		final QueryParameters queryParameters = getQueryParameters();
+		queryParameters.setScrollMode( scrollMode );
 		return getProducer().scroll(
-				generateQuerySpecification(),
-				getQueryParameters()
+				nativeSQLQuerySpecification,
+				queryParameters
 		);
 	}
 
@@ -230,6 +238,11 @@ public class NativeQueryImpl<T> extends AbstractProducedQuery<T> implements Nati
 		if ( shouldFlush() ) {
 			getProducer().flush();
 		}
+	}
+
+	@Override
+	public Iterator<T> iterate() {
+		throw new UnsupportedOperationException( "SQL queries do not currently support iteration" );
 	}
 
 	private boolean shouldFlush() {
@@ -577,6 +590,7 @@ public class NativeQueryImpl<T> extends AbstractProducedQuery<T> implements Nati
 	}
 
 	@Override
+	@SuppressWarnings("unchecked")
 	public NativeQueryImplementor<T> setParameter(QueryParameter parameter, Object value, Type type) {
 		super.setParameter( parameter, value, type );
 		return this;
@@ -601,115 +615,117 @@ public class NativeQueryImpl<T> extends AbstractProducedQuery<T> implements Nati
 	}
 
 	@Override
-	public NativeQueryImplementor setParameter(String name, Object value, TemporalType temporalType) {
+	public NativeQueryImplementor<T> setParameter(String name, Object value, TemporalType temporalType) {
 		super.setParameter( name, value, temporalType );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameter(int position, Object value, TemporalType temporalType) {
+	public NativeQueryImplementor<T> setParameter(int position, Object value, TemporalType temporalType) {
 		super.setParameter( position, value, temporalType );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameterList(QueryParameter parameter, Collection values) {
+	public NativeQueryImplementor<T> setParameterList(QueryParameter parameter, Collection values) {
 		super.setParameterList( parameter, values );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameterList(String name, Collection values) {
+	public NativeQueryImplementor<T> setParameterList(String name, Collection values) {
 		super.setParameterList( name, values );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameterList(String name, Collection values, Type type) {
+	public NativeQueryImplementor<T> setParameterList(String name, Collection values, Type type) {
 		super.setParameterList( name, values, type );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameterList(String name, Object[] values, Type type) {
+	public NativeQueryImplementor<T> setParameterList(String name, Object[] values, Type type) {
 		super.setParameterList( name, values, type );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameterList(String name, Object[] values) {
+	public NativeQueryImplementor<T> setParameterList(String name, Object[] values) {
 		super.setParameterList( name, values );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameter(Parameter param, Calendar value, TemporalType temporalType) {
+	@SuppressWarnings("unchecked")
+	public NativeQueryImplementor<T> setParameter(Parameter param, Calendar value, TemporalType temporalType) {
 		super.setParameter( param, value, temporalType );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameter(Parameter param, Date value, TemporalType temporalType) {
+	@SuppressWarnings("unchecked")
+	public NativeQueryImplementor<T> setParameter(Parameter param, Date value, TemporalType temporalType) {
 		super.setParameter( param, value, temporalType );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameter(String name, Calendar value, TemporalType temporalType) {
+	public NativeQueryImplementor<T> setParameter(String name, Calendar value, TemporalType temporalType) {
 		super.setParameter( name, value, temporalType );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameter(String name, Date value, TemporalType temporalType) {
+	public NativeQueryImplementor<T> setParameter(String name, Date value, TemporalType temporalType) {
 		super.setParameter( name, value, temporalType );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameter(int position, Calendar value, TemporalType temporalType) {
+	public NativeQueryImplementor<T> setParameter(int position, Calendar value, TemporalType temporalType) {
 		super.setParameter( position, value, temporalType );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setParameter(int position, Date value, TemporalType temporalType) {
+	public NativeQueryImplementor<T> setParameter(int position, Date value, TemporalType temporalType) {
 		super.setParameter( position, value, temporalType );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setResultTransformer(ResultTransformer transformer) {
+	public NativeQueryImplementor<T> setResultTransformer(ResultTransformer transformer) {
 		super.setResultTransformer( transformer );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setProperties(Map map) {
+	public NativeQueryImplementor<T> setProperties(Map map) {
 		super.setProperties( map );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setProperties(Object bean) {
+	public NativeQueryImplementor<T> setProperties(Object bean) {
 		super.setProperties( bean );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setMaxResults(int maxResult) {
+	public NativeQueryImplementor<T> setMaxResults(int maxResult) {
 		super.setMaxResults( maxResult );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setFirstResult(int startPosition) {
+	public NativeQueryImplementor<T> setFirstResult(int startPosition) {
 		super.setFirstResult( startPosition );
 		return this;
 	}
 
 	@Override
-	public NativeQueryImplementor setHint(String hintName, Object value) {
+	public NativeQueryImplementor<T> setHint(String hintName, Object value) {
 		super.setHint( hintName, value );
 		return this;
 	}

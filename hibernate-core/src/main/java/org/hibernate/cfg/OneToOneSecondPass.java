@@ -103,6 +103,7 @@ public class OneToOneSecondPass implements SecondPass {
 		binder.setCascade( cascadeStrategy );
 		binder.setAccessType( inferredData.getDefaultAccess() );
 		Property prop = binder.makeProperty();
+		prop.setOptional( optional );
 		if ( BinderHelper.isEmptyAnnotationValue( mappedBy ) ) {
 			/*
 			 * we need to check if the columns are in the right order
@@ -258,6 +259,7 @@ public class OneToOneSecondPass implements SecondPass {
 				}
 				else {
 					value.setForeignKeyName( StringHelper.nullIfEmpty( jpaFk.name() ) );
+					value.setForeignKeyDefinition( StringHelper.nullIfEmpty( jpaFk.foreignKeyDefinition() ) );
 				}
 			}
 		}

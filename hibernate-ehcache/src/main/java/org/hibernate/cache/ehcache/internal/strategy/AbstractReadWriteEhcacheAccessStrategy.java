@@ -52,7 +52,7 @@ abstract class AbstractReadWriteEhcacheAccessStrategy<T extends EhcacheTransacti
 
 	/**
 	 * Returns <code>null</code> if the item is not readable.  Locked items are not readable, nor are items created
-	 * afterQuery the start of this transaction.
+	 * after the start of this transaction.
 	 *
 	 * @see RegionAccessStrategy#get(SharedSessionContractImplementor, Object, long)
 	 * @see RegionAccessStrategy#get(SharedSessionContractImplementor, Object, long)
@@ -273,6 +273,15 @@ abstract class AbstractReadWriteEhcacheAccessStrategy<T extends EhcacheTransacti
 		@Override
 		public Lock lock(long timeout, UUID uuid, long lockId) {
 			return new Lock( timeout, uuid, lockId, version );
+		}
+
+		@Override
+		public String toString() {
+			return "Item{" +
+					"value=" + value +
+					", version=" + version +
+					", timestamp=" + timestamp +
+					'}';
 		}
 	}
 

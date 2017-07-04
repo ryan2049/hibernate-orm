@@ -21,7 +21,6 @@ import org.hibernate.HibernateException;
 import org.hibernate.LockMode;
 import org.hibernate.LockOptions;
 import org.hibernate.QueryException;
-import org.hibernate.ScrollableResults;
 import org.hibernate.dialect.Dialect;
 import org.hibernate.engine.spi.QueryParameters;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
@@ -43,6 +42,7 @@ import org.hibernate.persister.collection.QueryableCollection;
 import org.hibernate.persister.entity.Loadable;
 import org.hibernate.persister.entity.Lockable;
 import org.hibernate.persister.entity.Queryable;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.transform.ResultTransformer;
 import org.hibernate.type.EntityType;
 import org.hibernate.type.Type;
@@ -72,7 +72,7 @@ public class QueryLoader extends BasicLoader {
 	//private Type[] sqlResultTypes;
 	private Type[] queryReturnTypes;
 
-	private final Map<String, String> sqlAliasByEntityAlias = new HashMap<String, String>( 8 );
+	private final Map<String, String> sqlAliasByEntityAlias = new HashMap<>( 8 );
 
 	private EntityType[] ownerAssociationTypes;
 	private int[] owners;
@@ -157,7 +157,7 @@ public class QueryLoader extends BasicLoader {
 			entityAliases[i] = element.getClassAlias();
 			sqlAliasByEntityAlias.put( entityAliases[i], sqlAliases[i] );
 			// TODO should we just collect these like with the collections above?
-			sqlAliasSuffixes[i] = ( size == 1 ) ? "" : Integer.toString( i ) + "_";
+			sqlAliasSuffixes[i] = ( size == 1 ) ? "" : (Integer.toString( i ) + "_").intern();
 //			sqlAliasSuffixes[i] = element.getColumnAliasSuffix();
 			includeInSelect[i] = !element.isFetch();
 			if ( includeInSelect[i] ) {
@@ -166,6 +166,7 @@ public class QueryLoader extends BasicLoader {
 
 			owners[i] = -1; //by default
 			if ( element.isFetch() ) {
+				//noinspection StatementWithEmptyBody
 				if ( element.isCollectionJoin() || element.getQueryableCollection() != null ) {
 					// This is now handled earlier in this method.
 				}
@@ -332,7 +333,7 @@ public class QueryLoader extends BasicLoader {
 		}
 
 		//		there are other conditions we might want to add here, such as checking the result types etc
-		//		but those are better served afterQuery we have redone the SQL generation to use ASTs.
+		//		but those are better served after we have redone the SQL generation to use ASTs.
 
 
 		// we need both the set of locks and the columns to reference in locks
@@ -563,7 +564,7 @@ public class QueryLoader extends BasicLoader {
 
 	}
 
-	public ScrollableResults scroll(
+	public ScrollableResultsImplementor scroll(
 			final QueryParameters queryParameters,
 			final SharedSessionContractImplementor session) throws HibernateException {
 		checkQuery( queryParameters );

@@ -33,7 +33,7 @@ import org.junit.Test;
 
 import org.jboss.logging.Logger;
 
-import static org.hibernate.userguide.util.TransactionUtil.doInJPA;
+import static org.hibernate.testing.transaction.TransactionUtil.doInJPA;
 import static org.junit.Assert.assertNotNull;
 
 
@@ -64,7 +64,6 @@ public class SecondLevelCacheTest extends BaseEntityManagerFunctionalTestCase {
     @Test
     public void testCache() {
         doInJPA( this::entityManagerFactory, entityManager -> {
-            entityManager.persist( new Person() );
             entityManager.persist( new Person() );
 			Person aPerson= new Person();
 			aPerson.setName( "John Doe" );

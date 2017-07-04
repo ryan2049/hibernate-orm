@@ -12,6 +12,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.UUID;
 import javax.persistence.EntityGraph;
 import javax.persistence.EntityManagerFactory;
@@ -39,12 +40,10 @@ import org.hibernate.MultiIdentifierLoadAccess;
 import org.hibernate.NaturalIdLoadAccess;
 import org.hibernate.ReplicationMode;
 import org.hibernate.ScrollMode;
-import org.hibernate.ScrollableResults;
 import org.hibernate.Session;
 import org.hibernate.SessionEventListener;
 import org.hibernate.SharedSessionBuilder;
 import org.hibernate.SimpleNaturalIdLoadAccess;
-import org.hibernate.StaleStateException;
 import org.hibernate.Transaction;
 import org.hibernate.TypeHelper;
 import org.hibernate.UnknownProfileException;
@@ -61,6 +60,7 @@ import org.hibernate.persister.entity.EntityPersister;
 import org.hibernate.procedure.ProcedureCall;
 import org.hibernate.query.spi.NativeQueryImplementor;
 import org.hibernate.query.spi.QueryImplementor;
+import org.hibernate.query.spi.ScrollableResultsImplementor;
 import org.hibernate.resource.jdbc.spi.JdbcSessionContext;
 import org.hibernate.resource.transaction.spi.TransactionCoordinator;
 import org.hibernate.stat.SessionStatistics;
@@ -199,12 +199,12 @@ public class SessionDelegatorBaseImpl implements SessionImplementor {
 	}
 
 	@Override
-	public ScrollableResults scroll(String query, QueryParameters queryParameters) throws HibernateException {
+	public ScrollableResultsImplementor scroll(String query, QueryParameters queryParameters) throws HibernateException {
 		return delegate.scroll( query, queryParameters );
 	}
 
 	@Override
-	public ScrollableResults scroll(Criteria criteria, ScrollMode scrollMode) {
+	public ScrollableResultsImplementor scroll(Criteria criteria, ScrollMode scrollMode) {
 		return delegate.scroll( criteria, scrollMode );
 	}
 
@@ -259,7 +259,7 @@ public class SessionDelegatorBaseImpl implements SessionImplementor {
 	}
 
 	@Override
-	public ScrollableResults scrollCustomQuery(CustomQuery customQuery, QueryParameters queryParameters) throws HibernateException {
+	public ScrollableResultsImplementor scrollCustomQuery(CustomQuery customQuery, QueryParameters queryParameters) throws HibernateException {
 		return delegate.scrollCustomQuery( customQuery, queryParameters );
 	}
 
@@ -269,7 +269,7 @@ public class SessionDelegatorBaseImpl implements SessionImplementor {
 	}
 
 	@Override
-	public ScrollableResults scroll(NativeSQLQuerySpecification spec, QueryParameters queryParameters) throws HibernateException {
+	public ScrollableResultsImplementor scroll(NativeSQLQuerySpecification spec, QueryParameters queryParameters) throws HibernateException {
 		return delegate.scroll( spec, queryParameters );
 	}
 
@@ -404,6 +404,16 @@ public class SessionDelegatorBaseImpl implements SessionImplementor {
 	}
 
 	@Override
+	public void checkOpen() {
+		delegate.checkOpen();
+	}
+
+	@Override
+	public boolean isOpenOrWaitingForAutoClose() {
+		return delegate.isOpenOrWaitingForAutoClose();
+	}
+
+	@Override
 	public boolean shouldAutoClose() {
 		return delegate.shouldAutoClose();
 	}
@@ -411,6 +421,11 @@ public class SessionDelegatorBaseImpl implements SessionImplementor {
 	@Override
 	public boolean isAutoCloseSessionEnabled() {
 		return delegate.isAutoCloseSessionEnabled();
+	}
+
+	@Override
+	public boolean isQueryParametersValidationEnabled() {
+		return delegate.isQueryParametersValidationEnabled();
 	}
 
 	@Override
@@ -1156,5 +1171,20 @@ public class SessionDelegatorBaseImpl implements SessionImplementor {
 	@Override
 	public SqlTypeDescriptor remapSqlTypeDescriptor(SqlTypeDescriptor sqlTypeDescriptor) {
 		return delegate.remapSqlTypeDescriptor( sqlTypeDescriptor );
+	}
+
+	@Override
+	public Integer getJdbcBatchSize() {
+		return delegate.getJdbcBatchSize();
+	}
+
+	@Override
+	public void setJdbcBatchSize(Integer jdbcBatchSize) {
+		delegate.setJdbcBatchSize( jdbcBatchSize );
+	}
+
+	@Override
+	public TimeZone getJdbcTimeZone() {
+		return delegate.getJdbcTimeZone();
 	}
 }

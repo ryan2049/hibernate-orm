@@ -6,12 +6,10 @@
  */
 package org.hibernate.query.internal;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -51,31 +49,48 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 
 	private final SessionFactoryImplementor sessionFactory;
 	private final ParameterMetadata parameterMetadata;
+	private final boolean queryParametersValidationEnabled;
 
 	private Map<QueryParameter, QueryParameterBinding> parameterBindingMap;
 	private Map<QueryParameter, QueryParameterListBinding> parameterListBindingMap;
-	private List<QueryParameterBinding> positionalParameterBindings;
+	private Map<Integer, QueryParameterBinding> positionalParameterBindings;
 
-	public static QueryParameterBindingsImpl from(ParameterMetadata parameterMetadata,
-			SessionFactoryImplementor sessionFactory) {
+	public static QueryParameterBindingsImpl from(
+			ParameterMetadata parameterMetadata,
+			SessionFactoryImplementor sessionFactory,
+			boolean queryParametersValidationEnabled) {
 		if ( parameterMetadata == null ) {
-			return new QueryParameterBindingsImpl( sessionFactory, parameterMetadata );
+			return new QueryParameterBindingsImpl(
+					sessionFactory,
+					parameterMetadata,
+					queryParametersValidationEnabled
+			);
 		}
 		else {
-			return new QueryParameterBindingsImpl( sessionFactory, parameterMetadata.collectAllParameters(), parameterMetadata );
+			return new QueryParameterBindingsImpl(
+					sessionFactory,
+					parameterMetadata.collectAllParameters(),
+					parameterMetadata, queryParametersValidationEnabled
+			);
 		}
 	}
 
-	public QueryParameterBindingsImpl(SessionFactoryImplementor sessionFactory, ParameterMetadata parameterMetadata) {
-		this( sessionFactory, Collections.emptySet(), parameterMetadata );
+	private QueryParameterBindingsImpl(
+			SessionFactoryImplementor sessionFactory,
+			ParameterMetadata parameterMetadata,
+			boolean queryParametersValidationEnabled) {
+		this( sessionFactory, Collections.emptySet(), parameterMetadata, queryParametersValidationEnabled );
 	}
 
-	public QueryParameterBindingsImpl(SessionFactoryImplementor sessionFactory,
+	private QueryParameterBindingsImpl(
+			SessionFactoryImplementor sessionFactory,
 			Set<QueryParameter<?>> queryParameters,
-			ParameterMetadata parameterMetadata) {
+			ParameterMetadata parameterMetadata,
+			boolean queryParametersValidationEnabled) {
 		this.sessionFactory = sessionFactory;
 		this.parameterMetadata = parameterMetadata;
-		this.positionalParameterBindings = new ArrayList<>( 4 );
+		this.queryParametersValidationEnabled = queryParametersValidationEnabled;
+		this.positionalParameterBindings = new TreeMap<>(  );
 
 		if ( queryParameters == null || queryParameters.isEmpty() ) {
 			parameterBindingMap = Collections.emptyMap();
@@ -100,7 +115,7 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 	}
 
 	protected QueryParameterBinding makeBinding(Type bindType) {
-		return new QueryParameterBindingImpl( bindType, sessionFactory );
+		return new QueryParameterBindingImpl( bindType, sessionFactory, shouldValidateBindingValue() );
 	}
 
 	public boolean isBound(QueryParameter parameter) {
@@ -197,31 +212,25 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 	}
 
 	public QueryParameterBinding getBinding(int position) {
+		int positionAdjustment = 0;
+		if ( !parameterMetadata.isOrdinalParametersZeroBased() ) {
+			positionAdjustment = -1;
+		}
 		QueryParameterBinding binding = null;
 		if ( parameterMetadata != null ) {
-			if ( ! parameterMetadata.hasPositionalParameters() ) {
+			if ( !parameterMetadata.hasPositionalParameters() ) {
 				// no positional parameters, assume jpa named.
 				binding = locateBinding( Integer.toString( position ) );
 			}
 			else {
 				try {
-					if ( position < positionalParameterBindings.size() ) {
-						binding = positionalParameterBindings.get( position );
-						if ( binding == null ) {
-							binding = makeBinding( parameterMetadata.getQueryParameter( position ) );
-							positionalParameterBindings.set( position, binding );
-						}
-					}
-					else {
-						for ( int i = 0; i < position - positionalParameterBindings.size(); i++ ) {
-							positionalParameterBindings.add( null );
-						}
-						QueryParameter queryParameter = parameterMetadata.getQueryParameter( position );
-						binding = makeBinding( queryParameter );
-						positionalParameterBindings.add( binding );
+					binding = positionalParameterBindings.get( position + positionAdjustment );
+					if ( binding == null ) {
+						binding = makeBinding( parameterMetadata.getQueryParameter( position ) );
+						positionalParameterBindings.put( position + positionAdjustment, binding );
 					}
 				}
-				catch ( QueryParameterException e ) {
+				catch (QueryParameterException e) {
 					// treat this as null binding
 				}
 			}
@@ -247,8 +256,18 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 			}
 		}
 		// verify position parameters bound
-		for ( int i = 0; i < positionalParameterBindings.size(); i++ ) {
-			final QueryParameterBinding binding = positionalParameterBindings.get( i );
+		int startIndex = 0;
+		if ( !parameterMetadata.isOrdinalParametersZeroBased() ) {
+			startIndex = 1;
+		}
+		for ( int i = startIndex; i < positionalParameterBindings.size(); i++ ) {
+			QueryParameterBinding binding = null;
+			if ( parameterMetadata.isOrdinalParametersZeroBased() ) {
+				binding = positionalParameterBindings.get( i );
+			}
+			else {
+				binding = positionalParameterBindings.get( i - 1 );
+			}
 			if ( binding == null || !binding.isBound() ) {
 				throw new QueryException( "Positional parameter [" + i + "] not set" );
 			}
@@ -276,13 +295,12 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 
 	private int calculatePositionalValueSpan(boolean reserveFirstParameter) {
 		int positionalValueSpan = 0;
-		for ( QueryParameterBinding binding : positionalParameterBindings ) {
+		for ( QueryParameterBinding binding : positionalParameterBindings.values() ) {
 			if ( binding.isBound() ) {
 				Type bindType = binding.getBindType();
 				if ( bindType == null ) {
 					bindType = SerializableType.INSTANCE;
 				}
-				Object object = binding.getBindValue();
 				positionalValueSpan += bindType.getColumnSpan( sessionFactory );
 			}
 		}
@@ -316,13 +334,12 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 	 */
 	@Deprecated
 	public Type[] collectPositionalBindTypes() {
-		TreeMap<Integer, QueryParameterBinding> positionalParameterBindingMap = collectPositionalParameterBindings();
-		Type[] types = new Type[ positionalParameterBindingMap.size() ];
+		Type[] types = new Type[ positionalParameterBindings.size() ];
 
 		// NOTE : bindings should be ordered by position by nature of a TreeMap...
 		// NOTE : we also assume the contiguity of the positions
 
-		for ( Map.Entry<Integer, QueryParameterBinding> entry : positionalParameterBindingMap.entrySet() ) {
+		for ( Map.Entry<Integer, QueryParameterBinding> entry : positionalParameterBindings.entrySet() ) {
 			final int position = entry.getKey();
 
 			Type type = entry.getValue().getBindType();
@@ -337,27 +354,17 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 		return types;
 	}
 
-	private TreeMap<Integer, QueryParameterBinding> collectPositionalParameterBindings() {
-		final TreeMap<Integer, QueryParameterBinding> bindings = new TreeMap<>();
-		for ( int i = 0; i < positionalParameterBindings.size(); i++ ) {
-			bindings.put( i, positionalParameterBindings.get( i ) );
-		}
-
-		return bindings;
-	}
-
 	/**
 	 * @deprecated (since 5.2) expect a different approach to org.hibernate.engine.spi.QueryParameters in 6.0
 	 */
 	@Deprecated
 	public Object[] collectPositionalBindValues() {
-		TreeMap<Integer, QueryParameterBinding> positionalParameterBindingMap = collectPositionalParameterBindings();
-		Object[] values = new Object[ positionalParameterBindingMap.size() ];
+		Object[] values = new Object[ positionalParameterBindings.size() ];
 
 		// NOTE : bindings should be ordered by position by nature of a TreeMap...
 		// NOTE : we also assume the contiguity of the positions
 
-		for ( Map.Entry<Integer, QueryParameterBinding> entry : positionalParameterBindingMap.entrySet() ) {
+		for ( Map.Entry<Integer, QueryParameterBinding> entry : positionalParameterBindings.entrySet() ) {
 			final int position = entry.getKey();
 			values[ position ] = entry.getValue().getBindValue();
 		}
@@ -441,10 +448,17 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 			);
 		}
 
-		final QueryParameterListBinding<T> convertedBinding = new QueryParameterListBindingImpl<>( binding.getBindType() );
+		final QueryParameterListBinding<T> convertedBinding = new QueryParameterListBindingImpl<>(
+				binding.getBindType(),
+				shouldValidateBindingValue()
+		);
 		parameterListBindingMap.put( queryParameter, convertedBinding );
 
 		return convertedBinding;
+	}
+
+	private boolean shouldValidateBindingValue() {
+		return sessionFactory.getSessionFactoryOptions().isJpaBootstrap() && queryParametersValidationEnabled;
 	}
 
 	/**
@@ -586,9 +600,7 @@ public class QueryParameterBindingsImpl implements QueryParameterBindings {
 				);
 				final QueryParameterBinding syntheticBinding = makeBinding( entry.getValue().getBindType() );
 				syntheticBinding.setBindValue( bindValue );
-				if ( parameterBindingMap.put( syntheticParam, syntheticBinding ) != null ) {
-					throw new HibernateException( "Repeated usage of synthetic parameter name [" + syntheticName + "] while expanding list parameter." );
-				}
+				parameterBindingMap.put( syntheticParam, syntheticBinding );
 				i++;
 			}
 

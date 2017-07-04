@@ -31,6 +31,15 @@ public class ParameterMetadataImpl implements ParameterMetadata {
 
 	private final OrdinalParameterDescriptor[] ordinalDescriptors;
 	private final Map<String,NamedParameterDescriptor> namedDescriptorMap;
+	private boolean isOrdinalParametersZeroBased = true;
+
+	private ParameterMetadataImpl(
+			OrdinalParameterDescriptor[] ordinalDescriptors,
+			Map<String, NamedParameterDescriptor> namedDescriptorMap, boolean isOrdinalParametersZeroBased) {
+		this.ordinalDescriptors = ordinalDescriptors;
+		this.namedDescriptorMap = namedDescriptorMap;
+		this.isOrdinalParametersZeroBased = isOrdinalParametersZeroBased;
+	}
 
 	/**
 	 * Instantiates a ParameterMetadata container.
@@ -116,6 +125,9 @@ public class ParameterMetadataImpl implements ParameterMetadata {
 	 * @throws QueryParameterException If the position is out of range
 	 */
 	public OrdinalParameterDescriptor getOrdinalParameterDescriptor(int position) {
+		if ( !isOrdinalParametersZeroBased ) {
+			position--;
+		}
 		if ( position < 0 || position >= ordinalDescriptors.length ) {
 			throw new QueryParameterException(
 					"Position beyond number of declared ordinal parameters. " +
@@ -239,4 +251,21 @@ public class ParameterMetadataImpl implements ParameterMetadata {
 		return getNamedParameterDescriptor( name ).getSourceLocations();
 	}
 
+	@Override
+	public boolean isOrdinalParametersZeroBased() {
+		return isOrdinalParametersZeroBased;
+	}
+
+	@Override
+	public void setOrdinalParametersZeroBased(boolean isZeroBased) {
+		this.isOrdinalParametersZeroBased = isZeroBased;
+	}
+
+	public ParameterMetadataImpl getOrdinalParametersZeroBasedCopy() {
+		return new ParameterMetadataImpl(
+				this.ordinalDescriptors,
+				this.namedDescriptorMap,
+				true
+		);
+	}
 }

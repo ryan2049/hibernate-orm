@@ -118,6 +118,16 @@ public class JtaTransactionCoordinatorImpl implements TransactionCoordinator, Sy
 
 	}
 
+	/**
+	 * Needed because while iterating the observers list and executing the before/update callbacks,
+	 * some observers might get removed from the list.
+	 *
+	 * @return TransactionObserver
+	 */
+	private Iterable<TransactionObserver> observers() {
+		return new ArrayList<>( observers );
+	}
+
 	public SynchronizationCallbackCoordinator getSynchronizationCallbackCoordinator() {
 		if ( callbackCoordinator == null ) {
 			callbackCoordinator = performJtaThreadTracking
@@ -329,7 +339,7 @@ public class JtaTransactionCoordinatorImpl implements TransactionCoordinator, Sy
 		}
 		finally {
 			synchronizationRegistry.notifySynchronizationsBeforeTransactionCompletion();
-			for ( TransactionObserver observer : observers ) {
+			for ( TransactionObserver observer : observers() ) {
 				observer.beforeCompletion();
 			}
 		}
@@ -348,7 +358,7 @@ public class JtaTransactionCoordinatorImpl implements TransactionCoordinator, Sy
 
 		transactionCoordinatorOwner.afterTransactionCompletion( successful, delayed );
 
-		for ( TransactionObserver observer : observers ) {
+		for ( TransactionObserver observer : observers() ) {
 			observer.afterCompletion( successful, delayed );
 		}
 
@@ -406,7 +416,7 @@ public class JtaTransactionCoordinatorImpl implements TransactionCoordinator, Sy
 			errorIfInvalid();
 			getTransactionCoordinatorOwner().flushBeforeTransactionCompletion();
 
-			// we don't have to perform any beforeQuery/afterQuery completion processing here.  We leave that for
+			// we don't have to perform any before/after completion processing here.  We leave that for
 			// the Synchronization callbacks
 			jtaTransactionAdapter.commit();
 		}
@@ -415,7 +425,7 @@ public class JtaTransactionCoordinatorImpl implements TransactionCoordinator, Sy
 		public void rollback() {
 			errorIfInvalid();
 
-			// we don't have to perform any afterQuery completion processing here.  We leave that for
+			// we don't have to perform any after completion processing here.  We leave that for
 			// the Synchronization callbacks
 			jtaTransactionAdapter.rollback();
 		}

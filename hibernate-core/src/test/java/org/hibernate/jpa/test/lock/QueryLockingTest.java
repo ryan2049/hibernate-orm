@@ -14,15 +14,25 @@ import javax.persistence.Id;
 import javax.persistence.LockModeType;
 import javax.persistence.Query;
 import javax.persistence.Table;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.JoinType;
+import javax.persistence.criteria.ParameterExpression;
+import javax.persistence.criteria.Root;
 
 import org.hibernate.LockMode;
+import org.hibernate.dialect.SQLServerDialect;
 import org.hibernate.internal.SessionImpl;
 import org.hibernate.jpa.AvailableSettings;
 import org.hibernate.jpa.QueryHints;
 import org.hibernate.jpa.test.BaseEntityManagerFunctionalTestCase;
 import org.hibernate.query.NativeQuery;
 
+import org.hibernate.testing.DialectChecks;
+import org.hibernate.testing.RequiresDialect;
+import org.hibernate.testing.RequiresDialectFeature;
 import org.hibernate.testing.TestForIssue;
+import org.hibernate.testing.transaction.TransactionUtil;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -38,7 +48,7 @@ import static org.junit.Assert.fail;
 public class QueryLockingTest extends BaseEntityManagerFunctionalTestCase {
 	@Override
 	protected Class<?>[] getAnnotatedClasses() {
-		return new Class[] { Lockable.class, LocalEntity.class };
+		return new Class[] {Person.class, Lockable.class, LocalEntity.class};
 	}
 
 	@Override
@@ -84,7 +94,7 @@ public class QueryLockingTest extends BaseEntityManagerFunctionalTestCase {
 
 		em.getTransaction().commit();
 		em.clear();
-		
+
 		// ensure other modes still throw the exception
 		em.getTransaction().begin();
 		query = em.createQuery( "delete from Lockable l" ).unwrap( org.hibernate.query.Query.class );
@@ -327,6 +337,7 @@ public class QueryLockingTest extends BaseEntityManagerFunctionalTestCase {
 	 * lock some entities via a query and check the resulting lock mode type via EntityManager
 	 */
 	@Test
+	@RequiresDialectFeature( value = DialectChecks.DoesNotSupportFollowOnLocking.class)
 	public void testEntityLockModeStateAfterQueryLocking() {
 		// Create some test data
 		EntityManager em = getOrCreateEntityManager();
@@ -360,8 +371,34 @@ public class QueryLockingTest extends BaseEntityManagerFunctionalTestCase {
 		em.close();
 	}
 
-	@Entity( name = "LocalEntity" )
-	@Table( name = "LocalEntity" )
+	@Test
+	@TestForIssue(jiraKey = "HHH-11376")
+	@RequiresDialect( SQLServerDialect.class )
+	public void testCriteriaWithPessimisticLock() {
+		TransactionUtil.doInJPA( this::entityManagerFactory, entityManager -> {
+			CriteriaBuilder builder = entityManager.getCriteriaBuilder();
+			CriteriaQuery<Person> criteria = builder.createQuery( Person.class );
+			Root<Person> personRoot = criteria.from( Person.class );
+			ParameterExpression<Long> personIdParameter = builder.parameter( Long.class );
+
+			// Eagerly fetch the parent
+			personRoot.fetch( "parent", JoinType.LEFT );
+
+			criteria.select( personRoot )
+					.where( builder.equal( personRoot.get( "id" ), personIdParameter ) );
+
+			final List<Person> resultList = entityManager.createQuery( criteria )
+					.setParameter( personIdParameter, 1L )
+					.setLockMode( LockModeType.PESSIMISTIC_WRITE )
+					.getResultList();
+
+			resultList.isEmpty();
+
+		} );
+	}
+
+	@Entity(name = "LocalEntity")
+	@Table(name = "LocalEntity")
 	public static class LocalEntity {
 		private Integer id;
 		private String name;

@@ -349,6 +349,12 @@ public abstract class AbstractDelegatingSessionFactoryBuilder<T extends Abstract
 	}
 
 	@Override
+	public SessionFactoryBuilder applyConnectionProviderDisablesAutoCommit(boolean providerDisablesAutoCommit) {
+		delegate.applyConnectionProviderDisablesAutoCommit( providerDisablesAutoCommit );
+		return getThis();
+	}
+
+	@Override
 	public T applySqlComments(boolean enabled) {
 		delegate.applySqlComments( enabled );
 		return getThis();
@@ -359,6 +365,18 @@ public abstract class AbstractDelegatingSessionFactoryBuilder<T extends Abstract
 			String registrationName,
 			SQLFunction sqlFunction) {
 		delegate.applySqlFunction( registrationName, sqlFunction );
+		return getThis();
+	}
+
+	@Override
+	public T allowOutOfTransactionUpdateOperations(boolean allow) {
+		delegate.allowOutOfTransactionUpdateOperations( allow );
+		return getThis();
+	}
+
+	@Override
+	public SessionFactoryBuilder enableReleaseResourcesOnCloseEnabled(boolean enable) {
+		delegate.enableReleaseResourcesOnCloseEnabled( enable );
 		return getThis();
 	}
 

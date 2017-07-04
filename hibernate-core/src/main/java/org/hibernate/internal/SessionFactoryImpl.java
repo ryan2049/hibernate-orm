@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import javax.naming.Reference;
 import javax.naming.StringRefAddr;
 import javax.persistence.EntityGraph;
@@ -191,6 +192,7 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 
 	private final transient TypeResolver typeResolver;
 	private final transient TypeHelper typeHelper;
+	private transient StatisticsImplementor statisticsImplementor;
 
 
 	public SessionFactoryImpl(final MetadataImplementor metadata, SessionFactoryOptions options) {
@@ -271,13 +273,12 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 		}
 		final IntegratorObserver integratorObserver = new IntegratorObserver();
 		this.observer.addObserver( integratorObserver );
-		for ( Integrator integrator : serviceRegistry.getService( IntegratorService.class ).getIntegrators() ) {
-			integrator.integrate( metadata, this, this.serviceRegistry );
-			integratorObserver.integrators.add( integrator );
-		}
 		try {
+			for ( Integrator integrator : serviceRegistry.getService( IntegratorService.class ).getIntegrators() ) {
+				integrator.integrate( metadata, this, this.serviceRegistry );
+				integratorObserver.integrators.add( integrator );
+			}
 			//Generators:
-
 			this.identifierGenerators = new HashMap<>();
 			metadata.getEntityBindings().stream().filter( model -> !model.isInherited() ).forEach( model -> {
 				IdentifierGenerator generator = model.getIdentifier().createIdentifierGenerator(
@@ -319,17 +320,22 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 				final Map<String, HibernateException> errors = checkNamedQueries();
 				if ( !errors.isEmpty() ) {
 					StringBuilder failingQueries = new StringBuilder( "Errors in named queries: " );
-					String sep = "";
+					String separator = System.lineSeparator();
+
 					for ( Map.Entry<String, HibernateException> entry : errors.entrySet() ) {
 						LOG.namedQueryError( entry.getKey(), entry.getValue() );
-						failingQueries.append( sep ).append( entry.getKey() );
-						sep = ", ";
+
+						failingQueries
+							.append( separator)
+							.append( entry.getKey() )
+							.append( " failed because of: " )
+							.append( entry.getValue() );
 					}
 					throw new HibernateException( failingQueries.toString() );
 				}
 			}
 
-			// this needs to happen afterQuery persisters are all ready to go...
+			// this needs to happen after persisters are all ready to go...
 			this.fetchProfiles = new HashMap<>();
 			for ( org.hibernate.mapping.FetchProfile mappingProfile : metadata.getFetchProfiles() ) {
 				final FetchProfile fetchProfile = new FetchProfile( mappingProfile.getName() );
@@ -377,6 +383,7 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 				integrator.disintegrate( this, serviceRegistry );
 				integratorObserver.integrators.remove( integrator );
 			}
+			serviceRegistry.destroy();
 			throw e;
 		}
 	}
@@ -717,7 +724,7 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 	 * </ol>
 	 *
 	 * Note: Be aware that the sessionFactory instance still can
-	 * be a "heavy" object memory wise afterQuery close() has been called.  Thus
+	 * be a "heavy" object memory wise after close() has been called.  Thus
 	 * it is important to not keep referencing the instance to let the garbage
 	 * collector release the memory.
 	 * @throws HibernateException
@@ -737,8 +744,6 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 
 		cacheAccess.close();
 		metamodel.close();
-
-		cacheAccess.close();
 
 		queryPlanCache.cleanup();
 
@@ -1074,6 +1079,9 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 		private boolean autoClose;
 		private boolean autoClear;
 		private String tenantIdentifier;
+		private TimeZone jdbcTimeZone;
+		private boolean queryParametersValidationEnabled;
+
 		private List<SessionEventListener> listeners;
 
 		//todo : expose setting
@@ -1095,8 +1103,10 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 			if ( sessionFactory.getCurrentTenantIdentifierResolver() != null ) {
 				tenantIdentifier = sessionFactory.getCurrentTenantIdentifierResolver().resolveCurrentTenantIdentifier();
 			}
+			this.jdbcTimeZone = sessionFactory.getSessionFactoryOptions().getJdbcTimeZone();
 
 			listeners = sessionFactory.getSessionFactoryOptions().getBaselineSessionEventsListenerBuilder().buildBaselineList();
+			queryParametersValidationEnabled = sessionFactory.getSessionFactoryOptions().isQueryParametersValidationEnabled();
 		}
 
 
@@ -1138,6 +1148,11 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 			return sessionOwnerBehavior == SessionOwnerBehavior.LEGACY_JPA
 					? ManagedFlushCheckerLegacyJpaImpl.INSTANCE
 					: null;
+		}
+
+		@Override
+		public boolean isQueryParametersValidationEnabled() {
+			return this.queryParametersValidationEnabled;
 		}
 
 		@Override
@@ -1185,6 +1200,10 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 			return tenantIdentifier;
 		}
 
+		@Override
+		public TimeZone getJdbcTimeZone() {
+			return jdbcTimeZone;
+		}
 
 		// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 		// SessionBuilder
@@ -1305,12 +1324,25 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 			listeners.clear();
 			return (T) this;
 		}
+
+		@Override
+		public T jdbcTimeZone(TimeZone timeZone) {
+			jdbcTimeZone = timeZone;
+			return (T) this;
+		}
+
+		@Override
+		public T setQueryParameterValidation(boolean enabled) {
+			queryParametersValidationEnabled = enabled;
+			return (T) this;
+		}
 	}
 
 	public static class StatelessSessionBuilderImpl implements StatelessSessionBuilder, SessionCreationOptions {
 		private final SessionFactoryImpl sessionFactory;
 		private Connection connection;
 		private String tenantIdentifier;
+		private boolean queryParametersValidationEnabled;
 
 		public StatelessSessionBuilderImpl(SessionFactoryImpl sessionFactory) {
 			this.sessionFactory = sessionFactory;
@@ -1318,6 +1350,7 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 			if ( sessionFactory.getCurrentTenantIdentifierResolver() != null ) {
 				tenantIdentifier = sessionFactory.getCurrentTenantIdentifierResolver().resolveCurrentTenantIdentifier();
 			}
+			queryParametersValidationEnabled = sessionFactory.getSessionFactoryOptions().isQueryParametersValidationEnabled();
 		}
 
 		@Override
@@ -1384,6 +1417,11 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 		}
 
 		@Override
+		public TimeZone getJdbcTimeZone() {
+			return sessionFactory.getSessionFactoryOptions().getJdbcTimeZone();
+		}
+
+		@Override
 		public SessionOwner getSessionOwner() {
 			return null;
 		}
@@ -1401,6 +1439,17 @@ public final class SessionFactoryImpl implements SessionFactoryImplementor {
 		@Override
 		public ManagedFlushChecker getManagedFlushChecker() {
 			return null;
+		}
+
+		@Override
+		public boolean isQueryParametersValidationEnabled() {
+			return queryParametersValidationEnabled;
+		}
+
+		@Override
+		public StatelessSessionBuilder setQueryParameterValidation(boolean enabled) {
+			queryParametersValidationEnabled = enabled;
+			return this;
 		}
 	}
 

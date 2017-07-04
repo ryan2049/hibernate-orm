@@ -10,6 +10,7 @@ import java.io.Serializable;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -56,6 +57,8 @@ public class LockOptions implements Serializable {
 	private int timeout = WAIT_FOREVER;
 
 	private Map<String,LockMode> aliasSpecificLockModes;
+
+	private Boolean followOnLocking;
 
 	/**
 	 * Constructs a LockOptions with all default options.
@@ -111,7 +114,7 @@ public class LockOptions implements Serializable {
 	 */
 	public LockOptions setAliasSpecificLockMode(String alias, LockMode lockMode) {
 		if ( aliasSpecificLockModes == null ) {
-			aliasSpecificLockModes = new HashMap<String,LockMode>();
+			aliasSpecificLockModes = new LinkedHashMap<>();
 		}
 		aliasSpecificLockModes.put( alias, lockMode );
 		return this;
@@ -279,6 +282,25 @@ public class LockOptions implements Serializable {
 	}
 
 	/**
+	 * Retrieve the current follow-on-locking setting.
+	 *
+	 * @return true if follow-on-locking is enabled
+	 */
+	public Boolean getFollowOnLocking() {
+		return followOnLocking;
+	}
+
+	/**
+	 * Set the the follow-on-locking setting.
+	 * @param followOnLocking The new follow-on-locking setting
+	 * @return this (for method chaining).
+	 */
+	public LockOptions setFollowOnLocking(Boolean followOnLocking) {
+		this.followOnLocking = followOnLocking;
+		return this;
+	}
+
+	/**
 	 * Make a copy.
 	 *
 	 * @return The copy
@@ -304,6 +326,7 @@ public class LockOptions implements Serializable {
 		if ( source.aliasSpecificLockModes != null ) {
 			destination.aliasSpecificLockModes = new HashMap<String,LockMode>( source.aliasSpecificLockModes );
 		}
+		destination.setFollowOnLocking( source.getFollowOnLocking() );
 		return destination;
 	}
 }

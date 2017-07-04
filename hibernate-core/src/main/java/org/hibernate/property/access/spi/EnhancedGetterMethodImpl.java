@@ -21,7 +21,10 @@ import static org.hibernate.internal.CoreLogging.messageLogger;
 
 /**
  * @author Steve Ebersole
+ *
+ * @deprecated No longer used; {@link GetterFieldImpl} or {@link GetterMethodImpl} should be used instead.
  */
+@Deprecated
 public class EnhancedGetterMethodImpl implements Getter {
 	private static final CoreMessageLogger LOG = messageLogger( EnhancedGetterMethodImpl.class );
 

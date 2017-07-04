@@ -1433,25 +1433,25 @@ public class ASTParserLoadingTest extends BaseCoreFunctionalTestCase {
 				.setParameterList( "1", params )
 				.list();
 
-		s.createQuery( "from Human where nickname = ?1 and ( name.first = ?2 or name.last in (?3) )" )
+		s.createQuery( "from Human where nickName = ?1 and ( name.first = ?2 or name.last in (?3) )" )
 				.setParameter( "1", "Yogster" )
 				.setParameter( "2", "Yogi"  )
 				.setParameterList( "3", params )
 				.list();
 
-		s.createQuery( "from Human where nickname = ?1 and ( name.first = ?2 or name.last in ?3 )" )
+		s.createQuery( "from Human where nickName = ?1 and ( name.first = ?2 or name.last in ?3 )" )
 				.setParameter( "1", "Yogster" )
 				.setParameter( "2", "Yogi" )
 				.setParameterList( "3", params )
 				.list();
 
-		s.createQuery( "from Human where nickname = ?1 or ( name.first = ?2 and name.last in (?3) )" )
+		s.createQuery( "from Human where nickName = ?1 or ( name.first = ?2 and name.last in (?3) )" )
 				.setParameter( "1", "Yogster" )
 				.setParameter( "2", "Yogi"  )
 				.setParameterList( "3", params )
 				.list();
 
-		s.createQuery( "from Human where nickname = ?1 or ( name.first = ?2 and name.last in ?3 )" )
+		s.createQuery( "from Human where nickName = ?1 or ( name.first = ?2 and name.last in ?3 )" )
 				.setParameter( "1", "Yogster" )
 				.setParameter( "2", "Yogi"  )
 				.setParameterList( "3", params )
@@ -2234,7 +2234,7 @@ public class ASTParserLoadingTest extends BaseCoreFunctionalTestCase {
 		s.flush();
 
 		// Check order via SQL. Numbers are negated in the DB, so second comes first.
-		List listViaSql = s.createSQLQuery("select id from SIMPLE_1 order by negated_num").list();
+		List listViaSql = s.createSQLQuery("select ID from SIMPLE_1 order by negated_num").list();
 		assertEquals( 2, listViaSql.size() );
 		assertEquals( second.getId().longValue(), ((Number) listViaSql.get( 0 )).longValue() );
 		assertEquals( first.getId().longValue(), ((Number) listViaSql.get( 1 )).longValue() );
@@ -2284,7 +2284,7 @@ public class ASTParserLoadingTest extends BaseCoreFunctionalTestCase {
 
 	@Test
 	public void testLoadSnapshotWithCustomColumnReadAndWrite() {
-		// Exercises entity snapshot load when select-beforeQuery-update is true.
+		// Exercises entity snapshot load when select-before-update is true.
 		Session s = openSession();
 		Transaction t = s.beginTransaction();
 		final double SIZE_IN_KB = 1536d;
@@ -2465,11 +2465,11 @@ public class ASTParserLoadingTest extends BaseCoreFunctionalTestCase {
 		a.setDescription("an animal");
 		s.persist(a);
 		String[] aliases1 = s.createQuery("select a.bodyWeight as abw, a.description from Animal a").getReturnAliases();
-		assertEquals( aliases1[0], "abw" );
-		assertEquals(aliases1[1], "1");
+		assertEquals( "abw", aliases1[0] );
+		assertEquals( null, aliases1[1] );
 		String[] aliases2 = s.createQuery("select count(*), avg(a.bodyWeight) as avg from Animal a").getReturnAliases();
-		assertEquals( aliases2[0], "0" );
-		assertEquals(aliases2[1], "avg");
+		assertEquals( null, aliases2[0] );
+		assertEquals( "avg", aliases2[1] );
 		s.delete(a);
 		t.commit();
 		s.close();
